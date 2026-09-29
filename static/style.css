@@ -248,8 +248,10 @@ a:hover {
 
 .home-tribute {
     margin-top: 28px;
-    padding-top: 22px;
+    padding: 18px 20px;
     border-top: 1px solid #dfe8eb;
+    background: #f5f9ff;
+    border-radius: 12px;
     text-align: left;
 }
 
@@ -270,15 +272,16 @@ a:hover {
 .home-tribute blockquote {
     margin: 0;
     padding-left: 16px;
-    border-left: 3px solid var(--brand-blue);
-    color: #394b56;
-    font-size: 16px;
-    line-height: 1.6;
+    border-left: 4px solid var(--brand-blue);
+    color: #1f2d3d;
+    font-size: 17px;
+    line-height: 1.7;
+    font-weight: 600;
 }
 
 .tribute-attribution {
     margin: 12px 0 0;
-    color: #63727d;
+    color: #1f2d3d;
     font-weight: 700;
     text-align: right;
 }

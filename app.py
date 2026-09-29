@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, session, flash
 from pymongo import MongoClient, ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import os
 import secrets
@@ -11,6 +11,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "development-only-change-me")
+LOCAL_TZ = timezone(timedelta(hours=5, minutes=30))
 
 # ---------------- MONGODB DATABASE ----------------
 # Required environment variable:
@@ -261,7 +262,7 @@ def register():
             "contact": contact,
             "address": address,
             "qualification": qualification,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(LOCAL_TZ),
         }
         if email:
             user_document["email"] = email
@@ -322,7 +323,7 @@ def login():
             session["user_name"] = user["name"]
             session["checkin_id"] = user["checkin_id"]
 
-            checked_in_at = datetime.now().astimezone()
+            checked_in_at = datetime.now(LOCAL_TZ)
             login_time = checked_in_at.strftime("%Y-%m-%d %H:%M:%S")
             checkin_time = checked_in_at.strftime("%I:%M %p").lstrip("0")
             visit_token = secrets.token_urlsafe(32)
@@ -336,7 +337,7 @@ def login():
                 "logout_time": None,
                 "purpose": purpose,
                 "work_done": None,
-                "created_at": checked_in_at.astimezone(timezone.utc),
+                "created_at": checked_in_at,
             })
 
             session["visit_token"] = visit_token
@@ -532,7 +533,7 @@ def logout():
     if request.method == "GET":
         return render_template("logout.html", visit_token=visit_token)
 
-    checked_out_at = datetime.now().astimezone()
+    checked_out_at = datetime.now(LOCAL_TZ)
     logout_time = checked_out_at.strftime("%Y-%m-%d %H:%M:%S")
     work_done = request.form.get("work_done", "").strip()
 
