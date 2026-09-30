@@ -41,7 +41,8 @@
         </a>
     </section>
     {% else %}
-    <form method="POST" class="registration-form">
+    <form method="POST" class="registration-form" id="registration-form">
+        <input type="hidden" name="registration_request_id" value="{{ registration_request_id }}">
 
         <div class="field-group">
             <label for="name">Full name *</label>
@@ -102,6 +103,21 @@
         <button type="submit" class="full-width">Register Visitor</button>
 
     </form>
+
+    <script>
+        const registrationForm = document.getElementById("registration-form");
+        registrationForm.addEventListener("submit", (event) => {
+            if (registrationForm.dataset.submitting === "true") {
+                event.preventDefault();
+                return;
+            }
+
+            registrationForm.dataset.submitting = "true";
+            const submitButton = registrationForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = "Submitting...";
+        });
+    </script>
 
     <p>
         Already registered?

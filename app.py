@@ -77,6 +77,11 @@ def create_indexes():
         partialFilterExpression={"email": {"$type": "string"}},
     )
     users_collection.create_index("checkin_id", unique=True)
+    users_collection.create_index(
+        "registration_request_id",
+        unique=True,
+        sparse=True,
+    )
     login_logs_collection.create_index(
         [("user_id", 1), ("created_at", -1)]
     )
@@ -272,7 +277,22 @@ def admin_logout():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    registration_request_id = secrets.token_urlsafe(32)
+
     if request.method == "POST":
+        registration_request_id = (
+            request.form.get("registration_request_id", "").strip()
+            or registration_request_id
+        )
+        existing_user = users_collection.find_one(
+            {"registration_request_id": registration_request_id}
+        )
+        if existing_user:
+            session["registration_success"] = {
+                "checkin_id": existing_user["checkin_id"]
+            }
+            return redirect("/register")
+
         name = request.form.get("name", "").strip()
         age = request.form.get("age", "").strip()
         gender = request.form.get("gender", "").strip()
@@ -301,6 +321,7 @@ def register():
                             "contact": contact,
                             "address": address,
                             "qualification": qualification,
+                            "registration_request_id": registration_request_id,
                             "created_at": datetime.now(LOCAL_TZ),
                         }
                         if email:
@@ -310,22 +331,33 @@ def register():
                 session["registration_success"] = {"checkin_id": checkin_id}
                 return redirect("/register")
             except DuplicateKeyError as exc:
+                existing_user = users_collection.find_one(
+                    {"registration_request_id": registration_request_id}
+                )
+                if existing_user:
+                    session["registration_success"] = {
+                        "checkin_id": existing_user["checkin_id"]
+                    }
+                    return redirect("/register")
                 if email and "email" in str(exc).lower():
                     return render_template(
                         "register.html",
-                        error="An account with this email already exists."
+                        error="An account with this email already exists.",
+                        registration_request_id=registration_request_id,
                     )
                 continue
             except Exception:
                 return render_template(
                     "register.html",
-                    error="Registration failed. Please try again."
+                    error="Registration failed. Please try again.",
+                    registration_request_id=registration_request_id,
                 )
 
     registration_success = session.pop("registration_success", None)
     return render_template(
         "register.html",
         registration_success=registration_success,
+        registration_request_id=registration_request_id,
     )
 
 
