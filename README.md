@@ -1,9 +1,13 @@
-### current deployed version : 
-
+### current deployed version : (Testing Phase)
 https://skc-digital-logbook.vercel.app
 
 ##Techstack 
 
-Frontend 
+- Web
+- Python
+- Flask 
+- SQLite(local)
+- MongoDB
 
-Backend
+## Deployment
+- Vercel
