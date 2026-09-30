@@ -13,6 +13,26 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "development-only-change-me")
 LOCAL_TZ = timezone(timedelta(hours=5, minutes=30))
 
+
+def to_ist(dt):
+    """Return a timezone-aware datetime normalized to Indian Standard Time."""
+    if dt is None:
+        return None
+    if isinstance(dt, str):
+        dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=LOCAL_TZ)
+    return dt.astimezone(LOCAL_TZ)
+
+
+def format_ist_time(value):
+    """Format a datetime/string as an IST clock time like '4:38 PM'."""
+    dt = to_ist(value)
+    if dt is None:
+        return "Unavailable"
+    return dt.strftime("%I:%M %p").lstrip("0")
+
+
 # ---------------- MONGODB DATABASE ----------------
 # Required environment variable:
 # MONGO_URI = your MongoDB Atlas connection string
@@ -68,19 +88,26 @@ def create_indexes():
 
 
 def make_checkin_id():
-    """Generate a unique sequential Check-in ID such as skc1."""
+    """Generate the next unique check-in ID using an atomic MongoDB counter."""
     while True:
-        counter = db["counters"].find_one_and_update(
-            {"_id": "checkin_id"},
-            {"$inc": {"value": 1}},
-            upsert=True,
-            return_document=ReturnDocument.AFTER,
-        )
-        checkin_id = f"skc{counter['value']}"
-        if users_collection.find_one(
-            {"checkin_id": checkin_id}, {"_id": 1}
-        ) is None:
-            return checkin_id
+        with client.start_session() as session:
+            try:
+                with session.start_transaction():
+                    counter = db["counters"].find_one_and_update(
+                        {"_id": "checkin_id"},
+                        {"$inc": {"value": 1}},
+                        upsert=True,
+                        return_document=ReturnDocument.AFTER,
+                        session=session,
+                    ) or {"value": 0}
+                    checkin_id = f"skc{counter['value']}"
+                    if users_collection.find_one({"checkin_id": checkin_id}, session=session):
+                        raise DuplicateKeyError("checkin_id collision")
+                    return checkin_id
+            except DuplicateKeyError:
+                continue
+            except Exception:
+                continue
 
 
 def normalize_user(user):
@@ -166,6 +193,8 @@ create_indexes()
 
 @app.route("/")
 def home():
+    for key in ("user_id", "user_name", "checkin_id", "visit_token", "checkin_success"):
+        session.pop(key, None)
     return render_template("index.html")
 
 
@@ -252,36 +281,46 @@ def register():
         qualification = request.form.get("qualification", "").strip()
         email = request.form.get("email", "").strip().lower()
 
-        checkin_id = make_checkin_id()
+        while True:
+            try:
+                with client.start_session() as mongo_session:
+                    with mongo_session.start_transaction():
+                        counter = db["counters"].find_one_and_update(
+                            {"_id": "checkin_id"},
+                            {"$inc": {"value": 1}},
+                            upsert=True,
+                            return_document=ReturnDocument.AFTER,
+                            session=mongo_session,
+                        ) or {"value": 0}
+                        checkin_id = f"skc{counter['value']}"
+                        user_document = {
+                            "checkin_id": checkin_id,
+                            "name": name,
+                            "age": age,
+                            "gender": gender,
+                            "contact": contact,
+                            "address": address,
+                            "qualification": qualification,
+                            "created_at": datetime.now(LOCAL_TZ),
+                        }
+                        if email:
+                            user_document["email"] = email
+                        users_collection.insert_one(user_document, session=mongo_session)
 
-        user_document = {
-            "checkin_id": checkin_id,
-            "name": name,
-            "age": age,
-            "gender": gender,
-            "contact": contact,
-            "address": address,
-            "qualification": qualification,
-            "created_at": datetime.now(LOCAL_TZ),
-        }
-        if email:
-            user_document["email"] = email
-
-        try:
-            users_collection.insert_one(user_document)
-            session["registration_success"] = {"checkin_id": checkin_id}
-            return redirect("/register")
-
-        except DuplicateKeyError:
-            return render_template(
-                "register.html",
-                error="An account with this email already exists."
-            )
-        except Exception:
-            return render_template(
-                "register.html",
-                error="Registration failed. Please try again."
-            )
+                session["registration_success"] = {"checkin_id": checkin_id}
+                return redirect("/register")
+            except DuplicateKeyError as exc:
+                if email and "email" in str(exc).lower():
+                    return render_template(
+                        "register.html",
+                        error="An account with this email already exists."
+                    )
+                continue
+            except Exception:
+                return render_template(
+                    "register.html",
+                    error="Registration failed. Please try again."
+                )
 
     registration_success = session.pop("registration_success", None)
     return render_template(
@@ -291,6 +330,31 @@ def register():
 
 
 # ---------------- LOGIN ----------------
+
+@app.route("/visitor-checkout", methods=["GET", "POST"])
+def visitor_checkout():
+    checkin_id = request.form.get("checkin_id", "").strip().lower()
+
+    if request.method == "POST":
+        user = normalize_user(users_collection.find_one({"checkin_id": checkin_id}))
+        if user:
+            active_log = login_logs_collection.find_one(
+                {
+                    "user_id": user["id"],
+                    "logout_time": None,
+                },
+                sort=[("created_at", -1)],
+            )
+            visit_token = ensure_visit_token(active_log, user["checkin_id"])
+            if visit_token:
+                return redirect(f"/dashboard?visit_token={visit_token}")
+
+            flash("There is no active visit for this Check-in ID.")
+        else:
+            flash("Check-in ID not found. Please check it and try again.")
+
+    return render_template("visitor-checkout.html", checkin_id=checkin_id)
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -325,7 +389,7 @@ def login():
 
             checked_in_at = datetime.now(LOCAL_TZ)
             login_time = checked_in_at.strftime("%Y-%m-%d %H:%M:%S")
-            checkin_time = checked_in_at.strftime("%I:%M %p").lstrip("0")
+            checkin_time = format_ist_time(checked_in_at)
             visit_token = secrets.token_urlsafe(32)
 
             login_logs_collection.insert_one({
@@ -344,6 +408,7 @@ def login():
             session["checkin_success"] = {
                 "checkin_id": user["checkin_id"],
                 "checkin_time": checkin_time,
+                "user_name": user["name"],
                 "visit_token": visit_token,
             }
             return redirect(f"/check-in-success?visit_token={visit_token}")
@@ -368,6 +433,7 @@ def checkin_success():
         checkin = {
             "checkin_id": log.get("checkin_id", user["checkin_id"]),
             "checkin_time": log.get("checkin_time", ""),
+            "user_name": user["name"],
         }
         return render_template(
             "checkin-success.html",
@@ -381,6 +447,12 @@ def checkin_success():
     checkin = session.get("checkin_success")
     if not checkin:
         return redirect("/dashboard")
+
+    checkin = dict(checkin)
+    checkin["user_name"] = session.get(
+        "user_name",
+        checkin.get("user_name", "Visitor"),
+    )
 
     active_log = login_logs_collection.find_one(
         {"user_id": session["user_id"], "logout_time": None},
@@ -550,16 +622,14 @@ def logout():
     checkin_time = log.get("checkin_time")
     if not checkin_time:
         try:
-            checkin_time = datetime.strptime(
-                log["login_time"], "%Y-%m-%d %H:%M:%S"
-            ).strftime("%I:%M %p").lstrip("0")
+            checkin_time = format_ist_time(log["login_time"])
         except (KeyError, TypeError, ValueError):
             checkin_time = "Unavailable"
 
     checkout = {
         "checkin_id": log.get("checkin_id") or session.get("checkin_id", ""),
         "checkin_time": checkin_time,
-        "checkout_time": checked_out_at.strftime("%I:%M %p").lstrip("0"),
+        "checkout_time": format_ist_time(checked_out_at),
     }
     if visit_token:
         if session.get("visit_token") == visit_token:
@@ -582,16 +652,12 @@ def checkout_success():
         checkin_time = log.get("checkin_time")
         if not checkin_time:
             try:
-                checkin_time = datetime.strptime(
-                    log["login_time"], "%Y-%m-%d %H:%M:%S"
-                ).strftime("%I:%M %p").lstrip("0")
+                checkin_time = format_ist_time(log["login_time"])
             except (KeyError, TypeError, ValueError):
                 checkin_time = "Unavailable"
 
         try:
-            checkout_time = datetime.strptime(
-                log["logout_time"], "%Y-%m-%d %H:%M:%S"
-            ).strftime("%I:%M %p").lstrip("0")
+            checkout_time = format_ist_time(log["logout_time"])
         except (TypeError, ValueError):
             checkout_time = log["logout_time"]
 

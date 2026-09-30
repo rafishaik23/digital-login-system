@@ -22,6 +22,8 @@
         <nav class="home-actions" aria-label="Choose an action">
             <a class="home-action home-action-primary"
                href="{{ url_for('login') }}">Visitor Check-in</a>
+                <a class="home-action home-action-secondary"
+                    href="{{ url_for('visitor_checkout') }}">Visitor Check-out</a>
             <a class="home-action home-action-secondary"
                href="{{ url_for('admin_login') }}">Admin Login</a>
         </nav>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Visitor Check-out</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+<main class="form-container">
+    <div class="login-brand">
+        <img src="{{ url_for('static', filename='swechalogo.png') }}"
+             alt="Swecha Andhra Pradesh logo">
+    </div>
+    <h1>Visitor Check-out</h1>
+    <p class="form-intro">Enter your Check-in ID to continue your active visit and check out.</p>
+
+    {% with messages = get_flashed_messages() %}
+        {% for message in messages %}
+            <p class="message" role="alert">{{ message }}</p>
+        {% endfor %}
+    {% endwith %}
+
+    <form method="POST">
+        <label for="checkin_id">Check-in ID *</label>
+        <input
+            type="text"
+            id="checkin_id"
+            name="checkin_id"
+            placeholder="Enter your Check-in ID"
+            value="{{ checkin_id }}"
+            required
+        >
+
+        <button type="submit">Continue to Check-out</button>
+    </form>
+
+    <p><a href="{{ url_for('home') }}">Back to Home</a></p>
+</main>
+</body>
+
+</html>
