@@ -26,3 +26,6 @@ python -m pip install -r requirements.txt
 
 //starts the app using that environment.
 python .\app.py 
+
+## Create .env file 
+Add MONGODB_URI into the file.
