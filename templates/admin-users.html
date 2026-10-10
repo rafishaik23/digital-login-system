@@ -15,6 +15,10 @@
                 <p class="admin-eyebrow">Swecha Knowledge Center</p>
                 <h1>Registered Users</h1>
 
+                <nav class="admin-dashboard-actions" aria-label="User data actions">
+                    <a class="home-action home-action-primary" href="{{ url_for('admin_export_users') }}">Download Users Excel</a>
+                </nav>
+
                 <div class="admin-table-wrap">
                 <table class="admin-table">
             <thead>

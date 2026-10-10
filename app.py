@@ -1,9 +1,12 @@
-from flask import Flask, render_template, request, redirect, session, flash
+from flask import Flask, render_template, request, redirect, session, flash, send_file
 from pymongo import MongoClient, ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from bson import ObjectId
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.styles import Font
 import os
 import secrets
 
@@ -242,6 +245,52 @@ def admin_users():
     users = [normalize_user(user) for user in users]
 
     return render_template("admin-users.html", users=users)
+
+
+@app.route("/admin/users/export")
+def admin_export_users():
+    if not session.get("admin_logged_in"):
+        return redirect("/admin-login")
+
+    users = list(users_collection.find({}).sort("created_at", -1))
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Registered Users"
+
+    headers = ("Name", "ID", "Check-in ID", "Age", "Gender", "Email")
+    worksheet.append(headers)
+    for cell in worksheet[1]:
+        cell.font = Font(bold=True)
+
+    for user in users:
+        values = (
+            user.get("name", ""),
+            str(user["_id"]),
+            user.get("checkin_id", ""),
+            user.get("age", ""),
+            user.get("gender", ""),
+            user.get("email", "N/A"),
+        )
+        worksheet.append([
+            "" if value is None else str(value)
+            for value in values
+        ])
+        for cell in worksheet[worksheet.max_row]:
+            cell.data_type = "s"
+
+    worksheet.freeze_panes = "A2"
+    worksheet.auto_filter.ref = worksheet.dimensions
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="registered-users.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 @app.route("/admin/logbook")

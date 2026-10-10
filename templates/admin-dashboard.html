@@ -22,7 +22,10 @@
                 <a class="home-action home-action-primary" href="{{ url_for('admin_logbook') }}">View Logbook Entries</a>
             </nav>
 
-            <a class="admin-back-link admin-dashboard-logout" href="{{ url_for('admin_logout') }}">Log Out</a>
+            <nav class="admin-dashboard-footer" aria-label="Admin account and export actions">
+                <a class="admin-back-link" href="{{ url_for('admin_logout') }}">Log Out</a>
+                <a class="admin-back-link" href="{{ url_for('admin_export_users') }}">Download Users Excel</a>
+            </nav>
         </section>
     </main>
 </body>
