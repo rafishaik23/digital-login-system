@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="admin-page">
+        <a class="admin-top-back" href="{{ url_for('admin_dashboard') }}">Back to Admin Dashboard</a>
         <main class="admin-shell admin-shell-wide">
             <section class="admin-panel admin-panel-wide">
                 <div class="login-brand">
@@ -24,7 +25,6 @@
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th>ID</th>
                     <th>Check-in ID</th>
                     <th>Age</th>
                     <th>Gender</th>
@@ -35,7 +35,6 @@
                 {% for user in users %}
                 <tr>
                     <td>{{ user["name"] }}</td>
-                    <td>{{ user["id"] }}</td>
                     <td>{{ user["checkin_id"] }}</td>
                     <td>{{ user["age"] }}</td>
                     <td>{{ user["gender"] }}</td>
@@ -43,14 +42,13 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6">No users registered yet.</td>
+                    <td colspan="5">No users registered yet.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
                 </div>
 
-                <a class="admin-back-link" href="{{ url_for('admin_dashboard') }}">Back to Admin Dashboard</a>
             </section>
         </main>
 </body>

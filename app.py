@@ -257,7 +257,7 @@ def admin_export_users():
     worksheet = workbook.active
     worksheet.title = "Registered Users"
 
-    headers = ("Name", "ID", "Check-in ID", "Age", "Gender", "Email")
+    headers = ("Name", "Check-in ID", "Age", "Gender", "Email")
     worksheet.append(headers)
     for cell in worksheet[1]:
         cell.font = Font(bold=True)
@@ -265,7 +265,6 @@ def admin_export_users():
     for user in users:
         values = (
             user.get("name", ""),
-            str(user["_id"]),
             user.get("checkin_id", ""),
             user.get("age", ""),
             user.get("gender", ""),

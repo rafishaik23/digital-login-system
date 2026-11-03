@@ -5,6 +5,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="admin-page">
+        <a class="admin-top-back" href="{{ url_for('admin_dashboard') }}">Back to Admin Dashboard</a>
         <main class="admin-shell admin-shell-wide">
             <section class="admin-panel admin-panel-wide">
                 <div class="login-brand">
@@ -18,7 +19,6 @@
                 <table class="admin-table">
             <thead>
                 <tr>
-                    <th>ID</th>
                     <th>Check-in ID</th>
                     <th>User Name</th>
                     <th>Login Time</th>
@@ -30,7 +30,6 @@
             <tbody>
                 {% for log in logs %}
                 <tr>
-                    <td>{{ log["id"] }}</td>
                     <td>{{ log["checkin_id"] }}</td>
                     <td>{{ log["name"] }}</td>
                     <td>{{ log["login_time"] }}</td>
@@ -40,14 +39,13 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7">No log entries found.</td>
+                    <td colspan="6">No log entries found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
                 </div>
 
-                <a class="admin-back-link" href="{{ url_for('admin_dashboard') }}">Back to Admin Dashboard</a>
             </section>
         </main>
 </body>
